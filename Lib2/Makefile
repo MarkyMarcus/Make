@@ -1,4 +1,4 @@
-NAME	:= main
+NAME	:= lib2
 CC		:= clang
 LD		:= ld
 RM		:= rm
@@ -9,7 +9,7 @@ WFLAGS	= -Wall
 SYSROOT = $(shell xcrun --show-sdk-path --sdk macosx)
 VERSION	= $(shell xcrun --show-sdk-version --sdk macosx)
 CFLAGS	+= -isysroot $(SYSROOT) -I include
-LDFLAGS += -syslibroot $(SYSROOT) -lSystem
+LDFLAGS += -syslibroot $(SYSROOT) -lSystem -dylib
 
 %.o: %.c $(HEADERS)
 	$(call print, CC, $@)
