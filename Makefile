@@ -7,7 +7,6 @@ SYSROOT		:= $(shell xcrun --show-sdk-path --sdk macosx)
 VERSION		:= $(shell xcrun --show-sdk-version --sdk macosx)
 CFLAGS		+= -isysroot $(SYSROOT) -I include
 LDFLAGS		+= -syslibroot $(SYSROOT) -lSystem
-SUBPROJS	:= Lib1
 BUILDDIR	:= build
 EXPORTDIR	:= export
 BASEDIR		:= $(CURDIR)
@@ -15,48 +14,55 @@ BASEDIR		:= $(CURDIR)
 .PHONY: clean all
 
 define CREATE_RULES
-	NAME		:= 
-	HEADERS		:=
-	SOURCES		:=
-	EXPDIR		:=
-	BLDDIR		:=
-	OBJECTS		:=
+	TGT_NAME		:= 
+	TGT_HEADERS		:=
+	TGT_SOURCES		:=
+	TGT_EXPDIR		:=
+	TGT_BLDDIR		:=
+	TGT_OBJECTS		:=
+	TGT_LDFLAGS		:=
+	TGT_CFLAGS		:=
+    TGT_SUBPROJS    :=
 
     $(if $(1), include $(1)/rules.mk, include rules.mk)
 
-    NAME		?= $(notdir $(abspath $1))
-    HEADERS		:= $(if $(1), $(wildcard $(1)/include/*.h), $(wildcard include/*.h))
-    SOURCES		:= $(if $(1), $(wildcard $(1)/src/*.c), $(wildcard src/*.c))
-    EXPDIR		:= $(EXPORTDIR)/$$(NAME)
-    BLDDIR		:= $(BUILDDIR)/$$(NAME)
-    OBJECTS		:= $$(SOURCES:%.c=$$(BLDDIR)/%.o)
+    TGT_HEADERS		:= $(if $(1), $(wildcard $(1)/include/*.h), $(wildcard include/*.h))
+    TGT_SOURCES		:= $(if $(1), $(wildcard $(1)/src/*.c), $(wildcard src/*.c))
+    TGT_EXPDIR		:= $(EXPORTDIR)/$$(TGT_NAME)
+    TGT_BLDDIR		:= $(BUILDDIR)/$$(TGT_NAME)
+    TGT_OBJECTS		:= $$(TGT_SOURCES:%.c=$$(TGT_BLDDIR)/%.o)
+    TGT_LDFLAGS     := $(LDFLAGS) $$(TGT_LDFLAGS)
+    TGT_CFLAGS      := $(CFLAGS) $$(TGT_CFLAGS)
 
-    all: $$(EXPDIR)/$$(NAME)
+    all: $$(TGT_EXPDIR)/$$(TGT_NAME)
 
-    foo:
-		echo $$(NAME)
-		echo $$(HEADERS)
-		echo $$(SOURCES)
-		echo $$(EXPDIR)
-		echo $$(BLDDIR)
-		echo $(1)
-		echo $$(OBJECTS)
+    $$(TGT_NAME)_foo:
+		@echo $$(TGT_NAME)
+		@echo $$(TGT_HEADERS)
+		@echo $$(TGT_SOURCES)
+		@echo $$(TGT_EXPDIR)
+		@echo $$(TGT_BLDDIR)
+		@echo $(1)
+		@echo $$(TGT_OBJECTS)
 
-    $$(EXPDIR)/$$(NAME): $$(OBJECTS) $$(HEADERS) $$(EXPDIR)
+    $$(TGT_EXPDIR)/$$(TGT_NAME): $$(TGT_OBJECTS) $$(TGT_HEADERS) $$(TGT_EXPDIR)
 		$(call PRINT, LINK, $$@)
-		$$(LD) $$(LDFLAGS) -o $$@ $$(OBJECTS)
+		$$(LD) $$(TGT_LDFLAGS) -o $$@ $$(TGT_OBJECTS)
 
-    $$(BLDDIR)/%.o: %.c $$(HEADERS) $$(BLDDIR)/src
+    $$(TGT_BLDDIR)/%.o: %.c $$(TGT_HEADERS) $$(TGT_BLDDIR)/src
 		$(call PRINT, CC, $$@)
-		$$(CC) -c $$(CFLAGS) -o $$@ $$<
+		$$(CC) -c $$(TGT_CFLAGS) -o $$@ $$<
 
-    $$(BLDDIR)/src:
+    $$(TGT_BLDDIR)/src:
 		$(call PRINT, MKDIR, $$@)
 		$(MKDIR) -p $$@
 
-    $$(EXPDIR):
+    $$(TGT_EXPDIR):
 		$(call PRINT, MKDIR, $$@)
 		$(MKDIR) -p $$@
+
+    $(foreach PROJ,$$(TGT_SUBPROJS),\
+        $(eval $(call CREATE_RULES,$(PROJ))))
 endef
 
 define PRINT
@@ -64,9 +70,6 @@ define PRINT
 endef
 
 $(eval $(call CREATE_RULES))
-
-$(foreach PROJ,$(SUBPROJS),\
-    $(eval $(call CREATE_RULES,$(PROJ))))
 
 clean:
 	$(call PRINT, CLEAN)
