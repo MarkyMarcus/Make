@@ -1,67 +1,70 @@
-CC			:= clang
-LD			:= ld
-RM			:= rm
-MKDIR		:= mkdir
-WFLAGS		:= -Wall
-SYSROOT		:= $(shell xcrun --show-sdk-path --sdk macosx)
-VERSION		:= $(shell xcrun --show-sdk-version --sdk macosx)
-CFLAGS		+= -isysroot $(SYSROOT) -I include
-LDFLAGS		+= -syslibroot $(SYSROOT) -lSystem
-BUILDDIR	:= build
-EXPORTDIR	:= export
-BASEDIR		:= $(CURDIR)
+GLOBAL_CC			:= clang
+GLOBAL_LD			:= ld
+GLOBAL_RM			:= rm
+GLOBAL_MKDIR		:= mkdir
+GLOBAL_WFLAGS		:= -Wall
+GLOBAL_SYSROOT		:= $(shell xcrun --show-sdk-path --sdk macosx)
+GLOBAL_VERSION		:= $(shell xcrun --show-sdk-version --sdk macosx)
+GLOBAL_CFLAGS		+= -isysroot $(SYSROOT) -I include
+GLOBAL_LDFLAGS		+= -syslibroot $(SYSROOT) -lSystem
+GLOBAL_WFLAGS		+= -Werror
+GLOBAL_BUILDDIR		:= build
+GLOBAL_EXPORTDIR	:= export
+GLOBAL_BASEDIR		:= $(CURDIR)
 
 .PHONY: clean all
 
 define CREATE_RULES
-	TGT_NAME		:= 
-	TGT_HEADERS		:=
-	TGT_SOURCES		:=
-	TGT_EXPDIR		:=
-	TGT_BLDDIR		:=
-	TGT_OBJECTS		:=
-	TGT_LDFLAGS		:=
-	TGT_CFLAGS		:=
-    TGT_SUBPROJS    :=
+	include $(1)/rules.mk
 
-    $(if $(1), include $(1)/rules.mk, include rules.mk)
+	ifeq ($$(NAME),)
+	    $(error NAME must be defined in $(1)/rules.mk )
+	endif
 
-    TGT_HEADERS		:= $(if $(1), $(wildcard $(1)/include/*.h), $(wildcard include/*.h))
-    TGT_SOURCES		:= $(if $(1), $(wildcard $(1)/src/*.c), $(wildcard src/*.c))
-    TGT_EXPDIR		:= $(EXPORTDIR)/$$(TGT_NAME)
-    TGT_BLDDIR		:= $(BUILDDIR)/$$(TGT_NAME)
-    TGT_OBJECTS		:= $$(TGT_SOURCES:%.c=$$(TGT_BLDDIR)/%.o)
-    TGT_LDFLAGS     := $(LDFLAGS) $$(TGT_LDFLAGS)
-    TGT_CFLAGS      := $(CFLAGS) $$(TGT_CFLAGS)
+	ifeq ($$(TYPE),)
+	    $(error TYPE must be defined in $(1)/rules.mk )
+	endif
 
-    all: $$(TGT_EXPDIR)/$$(TGT_NAME)
+    HEADERS		:= $(wildcard $(1)/include/*.h)
+    SOURCES		:= $(wildcard $(1)/src/*.c)
+    EXPORTDIR	:= $(GLOBAL_EXPORTDIR)/$$(NAME)
+    BUILDDIR	:= $(GLOBAL_BUILDDIR)/$$(NAME)
+    OBJECTS		:= $$(SOURCES:%.c=$$(BUILDDIR)/%.o)
+    LDFLAGS     := $(GLOBAL_LDFLAGS) $$(LDFLAGS)
+    CFLAGS      := $(GLOBAL_CFLAGS) $$(CFLAGS)
+    WFLAGS      := $(GLOBAL_WFLAGS) $$(WFLAGS)
 
-    $$(TGT_NAME)_foo:
-		@echo $$(TGT_NAME)
-		@echo $$(TGT_HEADERS)
-		@echo $$(TGT_SOURCES)
-		@echo $$(TGT_EXPDIR)
-		@echo $$(TGT_BLDDIR)
-		@echo $(1)
-		@echo $$(TGT_OBJECTS)
+	ifeq ($$(TYPE),Program)
+		BINNAME	:= $$(NAME)
+	endif
+	ifeq ($$(TYPE),SharedLibrary)
+		BINNAME	:= lib$$(NAME).dylib
+	endif
+	ifeq ($$(TYPE),StaticLibrary)
+		BINNAME	:= lib$$(NAME).a
+	endif
 
-    $$(TGT_EXPDIR)/$$(TGT_NAME): $$(TGT_OBJECTS) $$(TGT_HEADERS) $$(TGT_EXPDIR)
+	ifeq ($(1),.)
+        all: $$(EXPORTDIR)/$$(BINNAME)
+	endif
+
+    $$(EXPORTDIR)/$$(BINNAME): $$(OBJECTS) $$(HEADERS) $$(EXPORTDIR)
 		$(call PRINT, LINK, $$@)
-		$$(LD) $$(TGT_LDFLAGS) -o $$@ $$(TGT_OBJECTS)
+		$$(LD) $$(LDFLAGS) -o $$@ $$(OBJECTS)
 
-    $$(TGT_BLDDIR)/%.o: %.c $$(TGT_HEADERS) $$(TGT_BLDDIR)/src
+    $$(BUILDDIR)/%.o: %.c $$(HEADERS) $$(BUILDDIR)/src
 		$(call PRINT, CC, $$@)
-		$$(CC) -c $$(TGT_CFLAGS) -o $$@ $$<
+		$$(CC) -c $$(CFLAGS) -o $$@ $$<
 
-    $$(TGT_BLDDIR)/src:
+    $$(BUILDDIR)/src:
 		$(call PRINT, MKDIR, $$@)
 		$(MKDIR) -p $$@
 
-    $$(TGT_EXPDIR):
+    $$(EXPORTDIR):
 		$(call PRINT, MKDIR, $$@)
 		$(MKDIR) -p $$@
 
-    $(foreach PROJ,$$(TGT_SUBPROJS),\
+    $(foreach PROJ,$$(SUBPROJS),\
         $(eval $(call CREATE_RULES,$(PROJ))))
 endef
 
@@ -69,7 +72,7 @@ define PRINT
 	@echo "$1\t$2"
 endef
 
-$(eval $(call CREATE_RULES))
+$(eval $(call CREATE_RULES,.))
 
 clean:
 	$(call PRINT, CLEAN)

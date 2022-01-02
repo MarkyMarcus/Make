@@ -1,2 +1,3 @@
-TGT_NAME	    := main
-TGT_SUBPROJS    := Lib1
+NAME	    := main
+TYPE		:= Program
+SUBPROJS    := Lib1
