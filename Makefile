@@ -12,9 +12,9 @@ GLOBAL_BUILDDIR		:= build
 GLOBAL_EXPORTDIR	:= export
 GLOBAL_BASEDIR		:= $(CURDIR)
 
-.PHONY: clean all
-
 define CREATE_RULES
+	SUBPROJS :=
+
     include $(1)/rules.mk
 
     ifeq "$$(NAME)" ""
@@ -66,14 +66,26 @@ define CREATE_RULES
 		$(call PRINT, MKDIR, $$@)
 		$(GLOBAL_MKDIR) -p $$@
 
-    $(foreach PROJ,$(SUBPROJS), $(eval $(call CREATE_RULES,$(PROJ))))
+    ifneq "$$(SUBPROJS)" ""
+        $$(foreach PROJ,$$(SUBPROJS), $$(eval $$(call CREATE_RULES,$$(PROJ))))
+    endif
 endef
 
 define PRINT
 	@echo "$1\t$2"
 endef
 
-$(eval $(call CREATE_RULES,.))
+define ADDPATH
+    $(if $2,$1/$(strip $2),$1)
+endef
+
+.PHONY: clean all
+
+foo:
+	@echo $(call ADDPATH,test)
+	@echo $(call ADDPATH,test,tmp/tmp)
+
+#$(eval $(call CREATE_RULES,.))
 
 clean:
 	$(call PRINT, CLEAN)
@@ -83,4 +95,3 @@ print-%:
 	@echo $*=$($*)
 
 $(V).SILENT:
-
