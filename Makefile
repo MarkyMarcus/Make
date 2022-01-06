@@ -1,95 +1,93 @@
-GLOBAL_CC			:= clang
-GLOBAL_LD			:= ld
-GLOBAL_RM			:= rm
-GLOBAL_MKDIR		:= mkdir
-GLOBAL_WFLAGS		:= -Wall
-GLOBAL_SYSROOT		:= $(shell xcrun --show-sdk-path --sdk macosx)
-GLOBAL_VERSION		:= $(shell xcrun --show-sdk-version --sdk macosx)
-GLOBAL_CFLAGS		+= -isysroot $(GLOBAL_SYSROOT) -I include
-GLOBAL_LDFLAGS		+= -syslibroot $(GLOBAL_SYSROOT) -lSystem
-GLOBAL_WFLAGS		+= -Werror
-GLOBAL_BUILDDIR		:= build
-GLOBAL_EXPORTDIR	:= export
-GLOBAL_BASEDIR		:= $(CURDIR)
+GLOBAL_CC           := clang
+GLOBAL_LD           := ld
+GLOBAL_RM           := rm
+GLOBAL_MKDIR        := mkdir
+GLOBAL_WFLAGS       := -Wall
+GLOBAL_SYSROOT      := $(shell xcrun --show-sdk-path --sdk macosx)
+GLOBAL_VERSION      := $(shell xcrun --show-sdk-version --sdk macosx)
+GLOBAL_CFLAGS       += -isysroot $(GLOBAL_SYSROOT) -I include
+GLOBAL_LDFLAGS      += -syslibroot $(GLOBAL_SYSROOT) -lSystem
+GLOBAL_WFLAGS       += -Werror
+GLOBAL_BUILDDIR     := build
+GLOBAL_EXPORTDIR    := export
+GLOBAL_BASEDIR      := $(CURDIR)
+
+define CREATE_PROGRAM
+    NAME :=
+    SOURCES :=
+    HEADERS :=
+    BUILDDIR :=
+    TARGDIR :=
+
+    include $(call APPENDPATH,$1,rules.mk)
+
+    SOURCES := $(wildcard $(call APPENDPATH,$1,src)/*.c)
+    HEADERS := $(wildcard $(call APPENDPATH,$1,include)/*.h)
+    OBJECTS := $$(SOURCES:%.c=$(GLOBAL_BUILDDIR)/%.o)
+	BUILDDIR := $(call APPENDPATH,$(GLOBAL_BUILDDIR),$1)
+	TARGDIR := $(call APPENDPATH,$(GLOBAL_EXPORTDIR),$1)
+
+    $(GLOBAL_EXPORTDIR)/$$(NAME): $$(OBJECTS) $$(HEADERS) $$(TARGDIR)
+		$(call PRINT, LINK, $$@)
+		$(GLOBAL_LD) $(GLOBAL_LDFLAGS) -o $$@ $$(OBJECTS)
+
+    $$(BUILDDIR)/src/%.o: src/%.c $$(BUILDDIR)/src
+		$(call PRINT, CC, $$@)
+		$(GLOBAL_CC) -c $(GLOBAL_CFLAGS) -o $$@ $$<
+
+    $$(BUILDDIR)/src: $$(BUILDDIR)
+		$(call PRINT, MKDIR, $$@)
+		$(GLOBAL_MKDIR) -p $$@
+
+    $$(BUILDDIR):
+		$(call PRINT, MKDIR, $$@)
+		$(GLOBAL_MKDIR) -p $$@
+	
+    $$(TARGDIR):
+		$(call PRINT, MKDIR, $$@)
+		$(GLOBAL_MKDIR) -p $$@
+endef
+
+define CREATE_LIBRARY
+    NAME :=
+
+    include $(call APPENDPATH,$1,rules.mk)
+
+    SOURCES := $(wildcard $(call APPENDPATH,$1,src)/*.c)
+    HEADERS := $(wildcard $(call APPENDPATH,$1,include)/*.h)
+
+endef
 
 define CREATE_RULES
-	SUBPROJS :=
+    TYPE :=
 
-    include $(1)/rules.mk
+    include $(call APPENDPATH,$1,rules.mk)
 
-    ifeq "$$(NAME)" ""
-        $$(error NAME must be defined in $(1)/rules.mk)
-    endif
-
-    ifeq "$$(TYPE)" ""
-        $$(error TYPE must be defined in $(1)/rules.mk)
-    endif
-
-    HEADERS		:= $(wildcard $(1)/include/*.h)
-    SOURCES		:= $(wildcard $(1)/src/*.c)
-    EXPORTDIR	:= $(GLOBAL_EXPORTDIR)/$$(NAME)
-    BUILDDIR	:= $(GLOBAL_BUILDDIR)/$$(NAME)
-    OBJECTS		:= $$(SOURCES:./%.c=$$(BUILDDIR)/%.o)
-    LDFLAGS		:= $(GLOBAL_LDFLAGS) $$(LDFLAGS)
-    CFLAGS		:= $(GLOBAL_CFLAGS) $$(CFLAGS)
-    WFLAGS		:= $(GLOBAL_WFLAGS) $$(WFLAGS)
-
-    ifeq "$$(TYPE)" "Program"
-        BINNAME	:= $$(NAME)
-    endif
-
-    ifeq "$$(TYPE)" "SharedLibrary"
-        BINNAME	:= lib$$(NAME).dylib
-    endif
-
-    ifeq "$$(TYPE)" "StaticLibrary"
-        BINNAME	:= lib$$(NAME).a
-    endif
-
-    ifeq "$(1)" "."
-        all: $$(EXPORTDIR)/$$(BINNAME)
-    endif
-
-    $$(EXPORTDIR)/$$(BINNAME): $$(OBJECTS) $$(HEADERS) $$(EXPORTDIR)
-		$(call PRINT, LINK, $$@)
-		$$(GLOBAL_LD) $$(LDFLAGS) -o $$@ $$(OBJECTS)
-
-    $$(BUILDDIR)/%.o: %.c $$(HEADERS) $$(BUILDDIR)/src
-		$(call PRINT, CC, $$@)
-		$$(GLOBAL_CC) -c $$(CFLAGS) -o $$@ $$<
-
-    $$(BUILDDIR)/src:
-		$(call PRINT, MKDIR, $$@)
-		$(GLOBAL_MKDIR) -p $$@
-
-    $$(EXPORTDIR):
-		$(call PRINT, MKDIR, $$@)
-		$(GLOBAL_MKDIR) -p $$@
-
-    ifneq "$$(SUBPROJS)" ""
-        $$(foreach PROJ,$$(SUBPROJS), $$(eval $$(call CREATE_RULES,$$(PROJ))))
-    endif
+    $$(if $$(findstring $$(TYPE),Program),$(eval $(call CREATE_PROGRAM,$1)),)
+    #$(if $$(findstring $$(TYPE),Library),$(eval $(call CREATE_LIBRARY,$1)),)
 endef
 
 define PRINT
-	@echo "$1\t$2"
+    @echo "$1\t$2"
 endef
 
-define ADDPATH
-    $(if $2,$1/$(strip $2),$1)
+define APPENDPATH
+    $(if $1,$(if $2,$1/$2,$1),$2)
 endef
 
 .PHONY: clean all
 
-foo:
-	@echo $(call ADDPATH,test)
-	@echo $(call ADDPATH,test,tmp/tmp)
+$(eval $(call CREATE_RULES))
 
-#$(eval $(call CREATE_RULES,.))
+foo:
+	@echo $(call APPENDPATH,test,)
+	@echo $(call APPENDPATH,test,tmp)
+	@echo $(call APPENDPATH,test,tmp/tmp)
+	@echo $(findstring "foo","foo")
 
 clean:
 	$(call PRINT, CLEAN)
-	$(RM) -rf $(BUILDDIR) $(EXPORTDIR)
+	$(RM) -rf $(GLOBAL_BUILDDIR) $(GLOBAL_EXPORTDIR)
 
 print-%:
 	@echo $*=$($*)
