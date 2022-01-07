@@ -1,2 +1,3 @@
-TGT_NAME        := lib1
-TGT_LDFLAGS		:= -dylib
+NAME        := lib1
+TYPE		:= Library
+LDFLAGS		:= -dylib

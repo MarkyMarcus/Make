@@ -13,12 +13,6 @@ GLOBAL_EXPORTDIR    := export
 GLOBAL_BASEDIR      := $(CURDIR)
 
 define CREATE_PROGRAM
-    NAME :=
-    SOURCES :=
-    HEADERS :=
-    BUILDDIR :=
-    TARGDIR :=
-
     include $(call APPENDPATH,$1,rules.mk)
 
     SOURCES := $(wildcard $(call APPENDPATH,$1,src)/*.c)
@@ -26,15 +20,14 @@ define CREATE_PROGRAM
     OBJECTS := $$(SOURCES:%.c=$(GLOBAL_BUILDDIR)/%.o)
     BUILDDIR := $(call APPENDPATH,$(GLOBAL_BUILDDIR),$1)
     TARGDIR := $(call APPENDPATH,$(GLOBAL_EXPORTDIR),$1)
-    CFLAGS := $(GLOBAL_CFLAGS) -I $(call APPENDPATH,$1,include)
 
     $(GLOBAL_EXPORTDIR)/$$(NAME): $$(OBJECTS) $$(HEADERS) $$(TARGDIR)
 		$(call PRINT, LINK, $$@)
-		$(GLOBAL_LD) $(GLOBAL_LDFLAGS) -o $$@ $$(OBJECTS)
+		$(GLOBAL_LD) $(GLOBAL_LDFLAGS) $$(LDFLAGS) -o $$@ $(OBJECTS)
 
     $$(BUILDDIR)/src/%.o: $(call APPENDPATH,$1,src)/%.c $$(BUILDDIR)/src
 		$(call PRINT, CC, $$@)
-		$(GLOBAL_CC) -c $$(CFLAGS) -o $$@ $$<
+		$(GLOBAL_CC) -c $(GLOBAL_CFLAGS) -I $(call APPENDPATH,$1,include) $$(CFLAGS) -o $$@ $$<
 
     $$(BUILDDIR)/src: $$(BUILDDIR)
 		$(call PRINT, MKDIR, $$@)
@@ -50,24 +43,50 @@ define CREATE_PROGRAM
 endef
 
 define CREATE_LIBRARY
-    NAME :=
-
     include $(call APPENDPATH,$1,rules.mk)
 
     SOURCES := $(wildcard $(call APPENDPATH,$1,src)/*.c)
     HEADERS := $(wildcard $(call APPENDPATH,$1,include)/*.h)
+    OBJECTS := $$(SOURCES:%.c=$(GLOBAL_BUILDDIR)/%.o)
+    BUILDDIR := $(call APPENDPATH,$(GLOBAL_BUILDDIR),$1)
+    TARGDIR := $(call APPENDPATH,$(GLOBAL_EXPORTDIR),$1)
 
+    $(GLOBAL_EXPORTDIR)/lib$$(NAME).dylib: $$(OBJECTS) $$(HEADERS) $$(TARGDIR)
+		$(call PRINT, LINK, $$@)
+		$(GLOBAL_LD) $(GLOBAL_LDFLAGS) $$(LDFLAGS) -o $$@ $$(OBJECTS)
+
+    $$(BUILDDIR)/src/%.o: $(call APPENDPATH,$1,src)/%.c $$(BUILDDIR)/src
+		$(call PRINT, CC, $$@)
+		$(GLOBAL_CC) -c $(GLOBAL_CFLAGS) -I $(call APPENDPATH,$1,include) $$(CFLAGS) -o $$@ $$<
+
+    $$(BUILDDIR)/src: $$(BUILDDIR)
+		$(call PRINT, MKDIR, $$@)
+		$(GLOBAL_MKDIR) -p $$@
+
+    $$(BUILDDIR):
+		$(call PRINT, MKDIR, $$@)
+		$(GLOBAL_MKDIR) -p $$@
+
+    $$(TARGDIR):
+		$(call PRINT, MKDIR, $$@)
+		$(GLOBAL_MKDIR) -p $$@
 endef
 
 define CREATE_RULES
-    TYPE :=
-
     include $(call APPENDPATH,$1,rules.mk)
 
-    #$$(if $$(findstring $$(TYPE),Program),$(eval $(call CREATE_PROGRAM,$1)),)
-    $$(if $$(findstring $$(TYPE),Library),$(eval $(call CREATE_LIBRARY,$1)),)
+    ifeq "$$(strip $$(TYPE))" "Program"
+        $$(eval $$(call CREATE_PROGRAM,$1))
+    endif
+
+    ifeq "$$(strip $$(TYPE))" "Library"
+        $$(eval $$(call CREATE_LIBRARY,$1))
+    endif
+
 endef
 
+#$$(if $$(findstring $$(TYPE),Program),$(eval $(call CREATE_PROGRAM,$1)))
+#$$(if $$(findstring $$(TYPE),Library),$(eval $(call CREATE_LIBRARY,$1)))
 define PRINT
     @echo "$1\t$2"
 endef
@@ -78,6 +97,7 @@ endef
 
 .PHONY: clean all
 
+$(eval $(call CREATE_RULES))
 $(eval $(call CREATE_RULES,Lib1))
 
 foo:
